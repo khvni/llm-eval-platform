@@ -5,14 +5,17 @@ export interface Prompt {
     createdAt: Date;
   }
   
-  export interface LLMResponse {
-    id: string;
-    promptId: string;
-    llmProvider: string;
+  export interface LLMAPIResponse {
     response: string;
     latency: number;
     tokenCount: number;
     error?: string | null;
+  }
+
+  export interface LLMResponse extends LLMAPIResponse {
+    id: string;
+    promptId: string;
+    llmProvider: string;
     createdAt: Date;
   }
   

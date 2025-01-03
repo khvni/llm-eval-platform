@@ -1,12 +1,12 @@
 import { Groq } from 'groq-sdk';
 import OpenAI from 'openai';
 import { Anthropic } from '@anthropic-ai/sdk';
-import { LLMResponse } from '../types/types';
+import { LLMAPIResponse, LLMResponse } from '../types/types';
 
 export class LLMService {
   private groq: Groq;
-  private openai: OpenAI;
-  private anthropic: Anthropic;
+  private openai?: OpenAI;
+  private anthropic?: Anthropic;
 
   constructor() {
     // Add support for multiple models per provider
@@ -20,6 +20,12 @@ export class LLMService {
         { apiKey: process.env.OPENAI_API_KEY }
       );
     }
+
+    if (process.env.ANTHROPIC_API_KEY) {
+      this.anthropic = new Anthropic({
+        apiKey: process.env.ANTHROPIC_API_KEY
+      });
+    }
   }
 
   async getCompletion(
@@ -27,7 +33,7 @@ export class LLMService {
     systemPrompt: string,
     provider: string,
     model?: string
-  ): Promise<LLMResponse> {
+  ): Promise<LLMAPIResponse> {
     const startTime = Date.now();
     
     try {
@@ -49,7 +55,7 @@ export class LLMService {
         response: '',
         latency: Date.now() - startTime,
         tokenCount: 0,
-        error: error.message
+        error: error instanceof Error ? error.message : 'Unknown error'
       };
     }
   }
@@ -69,5 +75,47 @@ export class LLMService {
       default:
         throw new Error(`Unsupported provider: ${provider}`);
     }
+  }
+
+  private async openaiCompletion(
+    prompt: string,
+    systemPrompt: string,
+    model: string = 'gpt-4'
+  ) {
+    if (!this.openai) {
+      throw new Error('OpenAI client not initialized');
+    }
+    
+    const completion = await this.openai.chat.completions.create({
+      model,
+      messages: [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: prompt }
+      ]
+    });
+
+    return {
+      text: completion.choices[0].message.content || '',
+      tokens: completion.usage?.total_tokens || 0
+    };
+  }
+
+  private async groqCompletion(
+    prompt: string,
+    systemPrompt: string,
+    model: string = 'mixtral-8x7b-32768'
+  ) {
+    const completion = await this.groq.chat.completions.create({
+      model,
+      messages: [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: prompt }
+      ]
+    });
+
+    return {
+      text: completion.choices[0].message?.content || '',
+      tokens: completion.usage?.total_tokens || 0
+    };
   }
 }
